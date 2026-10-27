@@ -65,7 +65,3 @@ scripts/   demo sessions
 docs/      design-log-p3.md
 reference/ instructor P2 reference (not used, my own P2 builds fine)
 ```
-
-## AI use
-
-I used Claude to help draft the registry, workspace and calculator code and the first version of the tests. Details are at the top of the design log.
