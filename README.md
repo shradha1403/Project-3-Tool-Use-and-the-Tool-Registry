@@ -1,58 +1,71 @@
-# ECE 309 · Project 3 starter — Tool Use and the Tool Registry
+# ECE 309 Project 3: Tool Use and the Tool Registry
 
-Read `P3_spec.md` (in this folder) first. This file only covers setting up the repo.
+This is my Project 3 for ECE 309. It extends the P2 chat harness so the model can actually do things: read a file, write a file, list a folder, or do arithmetic. The harness finds the tool call in the model's reply, runs it, puts the result back in the conversation, and asks the model again without waiting for the user. Control only goes back to the user when the model replies with plain text.
 
-## 1. Bring your P2 code
+Full assignment is in `P3_spec.md`. My design write-up is in `docs/design-log-p3.md`.
 
-Copy four files from your P2 repo (details in `src/core/README.md`):
+## What i implemented
 
-```
-include/core/conversation.h      include/core/sentinel_scanner.h
-src/core/conversation.cpp        src/core/sentinel_scanner.cpp
-```
+| Piece | File | What it does |
+|---|---|---|
+| `ToolRegistry` | `include/tools/tool_registry.h`, `src/tools/tool_registry.cpp` | hash table from tool name to tool. separate chaining, 64-bit FNV-1a, doubles at load factor 1.0 |
+| `Workspace::resolve` | `src/tools/workspace.cpp` | turns a model-supplied path into a path inside the workspace folder, or rejects it (pure text, never touches the filesystem) |
+| `calc_evaluate` | `src/tools/calculator_eval.cpp` | two-stack arithmetic evaluator, loops only so it handles very long and deeply nested expressions |
 
-Do **not** copy `message.h`; the P3 one adds `Role::Tool`.
+Everything else (JSON, tokenizer, file tools, dispatcher, harness, `main.cpp`) came with the starter. P2's `Conversation` and `SentinelScanner` are my own, copied into `include/core` and `src/core`.
 
-If your P2 code doesn't work, build against the instructor's reference instead:
+## Build and test
 
-```bash
-cmake -S . -B build -DUSE_P2_REFERENCE=ON
-```
-
-## 2. Build and test (Linux / WSL2)
+Needs Linux or WSL2 (ASan and UBSan are on by default).
 
 ```bash
-cmake -S . -B build              # ASan + UBSan are on by default
+cmake -S . -B build -DMH_WERROR=ON
 cmake --build build -j
-./build/test_p2                  # P2 regression: must pass before you start
-./build/test_loop                # provided tool-loop tests: pass once your 3 pieces work
-./build/test_p3                  # your P3 tests
-cd build && ctest --output-on-failure   # everything, plus the end-to-end goldens
+cd build && ctest --output-on-failure
 ```
 
-To check that you compile with zero warnings, as the grader does, add
-`-DMH_WERROR=ON` to the configure line.
-
-## 3. Try the harness
+Or run the pieces on their own:
 
 ```bash
-./build/miniharness --no-tools --script scripts/greeting.script   # works on day 1
-./build/miniharness --tools                                       # needs your ToolRegistry
-./build/miniharness --script scripts/tools_demo.script            # needs all three pieces
+./build/test_p2      # P2 regression
+./build/test_loop    # provided tool-loop tests
+./build/test_p3      # my tests (try: ./build/test_p3 reg_)
+```
+
+## Try it
+
+```bash
+./build/miniharness --tools
+./build/miniharness --script scripts/tools_demo.script
 ./build/miniharness --script scripts/escape_attempt.script
 ```
 
-`tools_demo` writes `workspace/notes/summary.txt`. That's fine: the e2e tests
-use their own copy in `tests/e2e/workspace/`. To start the demo over, delete
-that file.
+`tools_demo` writes `workspace/notes/summary.txt`. Delete that file to reset the demo.
 
-## 4. What is yours
+## Results
 
-| File | Status |
+All four ctest suites pass (P2 regression, p3, tool loop, e2e goldens) with `-Werror` and sanitizers on.
+
+For the 10,000 tools `tool_0` to `tool_9999`:
+
+| | value |
 |---|---|
-| `src/tools/tool_registry.cpp` and the private section of `include/tools/tool_registry.h` | **you implement** (45 pts) |
-| `src/tools/workspace.cpp` (`Workspace::resolve` only) | **you implement** (15 pts) |
-| `src/tools/calculator_eval.cpp` (`calc_evaluate`) | **you implement** (10 pts) |
-| `tests/p3/test_p3.cpp` (≥ 15 tests) | **you write** |
-| `docs/design-log-p3.md` | **you write** |
-| everything else | provided, do not modify |
+| buckets | 16384 |
+| load factor | 0.610 |
+| longest chain (FNV-1a) | 6 |
+| longest chain with the weak hash `s[0] + s.size()` | 9000 |
+
+## Layout
+
+```
+include/   headers (core, json, tools, harness, model, util)
+src/       implementation (core, json, tools, harness, model, main.cpp)
+tests/     p2 regression, p3 tool loop, my p3 suite, e2e golden sessions
+scripts/   demo sessions
+docs/      design-log-p3.md
+reference/ instructor P2 reference (not used, my own P2 builds fine)
+```
+
+## AI use
+
+I used Claude to help draft the registry, workspace and calculator code and the first version of the tests. Details are at the top of the design log.
